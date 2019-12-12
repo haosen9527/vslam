@@ -22,6 +22,7 @@
 #include "LoopClosing.h"
 #include "ORBmatcher.h"
 #include "Optimizer.h"
+#include "unistd.h"
 
 #include<mutex>
 
@@ -32,6 +33,17 @@ LocalMapping::LocalMapping(Map *pMap, const float bMonocular):
     mbMonocular(bMonocular), mbResetRequested(false), mbFinishRequested(false), mbFinished(true), mpMap(pMap),
     mbAbortBA(false), mbStopped(false), mbStopRequested(false), mbNotStop(false), mbAcceptKeyFrames(true)
 {
+    // mpParams = pParams;
+    // mnLocalWindowSize = ConfigParam::GetLocalWindowSize();
+    // cout<<"mnLocalWindowSize:"<<mnLocalWindowSize<<endl;
+
+    // mbVINSInited = false;
+    // mbFirstTry = true;
+    // mbFirstVINSInited = false;
+
+    // mbUpdatingInitPoses = false;
+    // mbCopyInitKFs = false;
+    // mbInitGBAFinish = false;
 }
 
 void LocalMapping::SetLoopCloser(LoopClosing* pLoopCloser)
@@ -58,18 +70,24 @@ void LocalMapping::Run()
         if(CheckNewKeyFrames())
         {
             // BoW conversion and insertion in Map
+            // cout << "LocalMapping::Run() : new keyframes are in!" << endl;
             ProcessNewKeyFrame();
+            // cout << "LocalMapping::Run() : Processed New KeyFrame" << endl;
 
             // Check recent MapPoints
             MapPointCulling();
+            // cout << "LocalMapping::Run() : recent MapPoints checked." << endl;
 
             // Triangulate new MapPoints
             CreateNewMapPoints();
+            // cout << "LocalMapping::Run() : new MapPoints Triangulated." << endl;
 
             if(!CheckNewKeyFrames())
             {
                 // Find more matches in neighbor keyframes and fuse point duplications
+                // cout << "LocalMapping::Run() : Find more matches in neighbor keyframes and fuse point duplications" << endl;
                 SearchInNeighbors();
+                // cout << "LocalMapping::Run() : Searched In Neighbors" << endl;
             }
 
             mbAbortBA = false;
@@ -77,14 +95,20 @@ void LocalMapping::Run()
             if(!CheckNewKeyFrames() && !stopRequested())
             {
                 // Local BA
-                if(mpMap->KeyFramesInMap()>2)
+                // cout << "LocalMapping::Run() : Local BA" << endl;
+
+                if(mpMap->KeyFramesInMap()>2){
                     Optimizer::LocalBundleAdjustment(mpCurrentKeyFrame,&mbAbortBA, mpMap);
+                }
+                // cout << "LocalMapping::Run() : Local BA finished" << endl;
 
                 // Check redundant local Keyframes
                 KeyFrameCulling();
+                // cout << "LocalMapping::Run() : Checked redundant local Keyframes" << endl;
             }
 
             mpLoopCloser->InsertKeyFrame(mpCurrentKeyFrame);
+            // cout << "LocalMapping::Run() : Inserted KeyFrame" << endl;
         }
         else if(Stop())
         {
@@ -459,6 +483,7 @@ void LocalMapping::SearchInNeighbors()
         nn=20;
     const vector<KeyFrame*> vpNeighKFs = mpCurrentKeyFrame->GetBestCovisibilityKeyFrames(nn);
     vector<KeyFrame*> vpTargetKFs;
+
     for(vector<KeyFrame*>::const_iterator vit=vpNeighKFs.begin(), vend=vpNeighKFs.end(); vit!=vend; vit++)
     {
         KeyFrame* pKFi = *vit;
@@ -485,7 +510,6 @@ void LocalMapping::SearchInNeighbors()
     for(vector<KeyFrame*>::iterator vit=vpTargetKFs.begin(), vend=vpTargetKFs.end(); vit!=vend; vit++)
     {
         KeyFrame* pKFi = *vit;
-
         matcher.Fuse(pKFi,vpMapPointMatches);
     }
 
@@ -636,6 +660,7 @@ void LocalMapping::KeyFrameCulling()
     // in at least other 3 keyframes (in the same or finer scale)
     // We only consider close stereo points
     vector<KeyFrame*> vpLocalKeyFrames = mpCurrentKeyFrame->GetVectorCovisibleKeyFrames();
+    // cout << "LocalMapping::KeyFrameCulling() : Current KeyFrame has " << vpLocalKeyFrames.size() << " neighbours." << endl;
 
     for(vector<KeyFrame*>::iterator vit=vpLocalKeyFrames.begin(), vend=vpLocalKeyFrames.end(); vit!=vend; vit++)
     {
@@ -643,6 +668,7 @@ void LocalMapping::KeyFrameCulling()
         if(pKF->mnId==0)
             continue;
         const vector<MapPoint*> vpMapPoints = pKF->GetMapPointMatches();
+        // cout << "LocalMapping::KeyFrameCulling() : This KeyFrame has " << vpMapPoints.size() << " matched MapPoints." << endl;
 
         int nObs = 3;
         const int thObs=nObs;
@@ -655,6 +681,7 @@ void LocalMapping::KeyFrameCulling()
             {
                 if(!pMP->isBad())
                 {
+                    // cout << "LocalMapping::KeyFrameCulling() : This pMP is good." << endl;
                     if(!mbMonocular)
                     {
                         if(pKF->mvDepth[i]>pKF->mThDepth || pKF->mvDepth[i]<0)
@@ -662,8 +689,10 @@ void LocalMapping::KeyFrameCulling()
                     }
 
                     nMPs++;
+                    // cout << "LocalMapping::KeyFrameCulling() : nMPs =" << nMPs << endl;
                     if(pMP->Observations()>thObs)
                     {
+                        // cout << "LocalMapping::KeyFrameCulling() : pMP->Observations() =" << pMP->Observations() << endl;
                         const int &scaleLevel = pKF->mvKeysUn[i].octave;
                         const map<KeyFrame*, size_t> observations = pMP->GetObservations();
                         int nObs=0;
@@ -685,14 +714,17 @@ void LocalMapping::KeyFrameCulling()
                         {
                             nRedundantObservations++;
                         }
+                        // cout << "LocalMapping::KeyFrameCulling() : nRedundantObservations =" << nRedundantObservations << endl;
                     }
                 }
             }
         }  
+        // cout << "LocalMapping::KeyFrameCulling() : final nRedundantObservations = " << nRedundantObservations << endl;
 
         if(nRedundantObservations>0.9*nMPs)
             pKF->SetBadFlag();
     }
+    // cout << "LocalMapping::KeyFrameCulling() : finished" << endl;
 }
 
 cv::Mat LocalMapping::SkewSymmetricMatrix(const cv::Mat &v)
@@ -756,5 +788,51 @@ bool LocalMapping::isFinished()
     unique_lock<mutex> lock(mMutexFinish);
     return mbFinished;
 }
+
+
+
+//-------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------
+// For IMU
+// bool LocalMapping::GetMapUpdateFlagForTracking()
+// {
+//     unique_lock<mutex> lock(mMutexMapUpdateFlag);
+//     return mbMapUpdateFlagForTracking;
+// }
+
+// void LocalMapping::SetMapUpdateFlagInTracking(bool bflag)
+// {
+//     unique_lock<mutex> lock(mMutexMapUpdateFlag);
+//     mbMapUpdateFlagForTracking = bflag;
+//     if(bflag)
+//     {
+//         mpMapUpdateKF = mpCurrentKeyFrame;
+//     }
+// }
+
+// bool LocalMapping::GetVINSInited(void)
+// {
+//     unique_lock<mutex> lock(mMutexVINSInitFlag);
+//     return mbVINSInited;
+// }
+
+// void LocalMapping::SetVINSInited(bool flag)
+// {
+//     unique_lock<mutex> lock(mMutexVINSInitFlag);
+//     mbVINSInited = flag;
+// }
+
+// bool LocalMapping::GetFirstVINSInited(void)
+// {
+//     unique_lock<mutex> lock(mMutexFirstVINSInitFlag);
+//     return mbFirstVINSInited;
+// }
+
+// void LocalMapping::SetFirstVINSInited(bool flag)
+// {
+//     unique_lock<mutex> lock(mMutexFirstVINSInitFlag);
+//     mbFirstVINSInited = flag;
+// }
+
 
 } //namespace ORB_SLAM
