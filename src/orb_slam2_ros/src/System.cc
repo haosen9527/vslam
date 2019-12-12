@@ -40,7 +40,7 @@ namespace ORB_SLAM2
 {
 
 System::System(const string &strVocFile, const string &strSettingsFile, const eSensor sensor,
-               const bool bUseViewer):mSensor(sensor), mpViewer(static_cast<Viewer*>(NULL)), mbReset(false),mbActivateLocalizationMode(false),
+               const bool bUseViewer,const bool PureLocalization ):mSensor(sensor), mpViewer(static_cast<Viewer*>(NULL)), mbReset(false),mbActivateLocalizationMode(false),
         mbDeactivateLocalizationMode(false)
 {
     // Output welcome message
@@ -135,13 +135,17 @@ System::System(const string &strVocFile, const string &strSettingsFile, const eS
         }
     }
 
-    // Choose to use pure localization mode
-    char IsPureLocalization;
-    cout << "Do you want to run pure localization?(y/n)" << endl;
-    cin >> IsPureLocalization;
-    if(IsPureLocalization == 'Y' || IsPureLocalization == 'y'){  
-        ActivateLocalizationMode();
+    if(PureLocalization)
+    {
+      // Choose to use pure localization mode
+      char IsPureLocalization;
+      cout << "Do you want to run pure localization?(y/n)" << endl;
+      cin >> IsPureLocalization;
+      if(IsPureLocalization == 'Y' || IsPureLocalization == 'y'){
+          ActivateLocalizationMode();
+      }
     }
+
 
     //Load map
     char IsLoadMap;

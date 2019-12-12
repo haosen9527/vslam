@@ -26,14 +26,19 @@
 
 #include <ros/ros.h>
 #include <ros/package.h>
+#include <geometry_msgs/Pose.h>
+#include <geometry_msgs/PointStamped.h>
+#include <tf/transform_broadcaster.h>
+#include <nav_msgs/Odometry.h>
+#include <nav_msgs/Path.h>
 #include <cv_bridge/cv_bridge.h>
 #include <message_filters/subscriber.h>
 #include <message_filters/time_synchronizer.h>
 #include <message_filters/sync_policies/approximate_time.h>
 
-#include<opencv2/core/core.hpp>
+#include <opencv2/core/core.hpp>
 
-#include"System.h"
+#include "System.h"
 
 using namespace std;
 
@@ -44,52 +49,80 @@ public:
 
     void GrabRGBD(const sensor_msgs::ImageConstPtr& msgRGB,const sensor_msgs::ImageConstPtr& msgD);
 
+    void rgbd_Vo(cv::Mat Tcw);
+
     ORB_SLAM2::System* mpSLAM;
+    ros::Publisher* pPosPub;
+    ros::Publisher* cameraPath;
+    ros::Publisher* odomVo;
+    nav_msgs::Path camera_path;
+    tf::TransformBroadcaster odomBr;
+    tf::Transform transform;
 };
 
-int main(int argc, char **argv)
+void ImageGrabber::rgbd_Vo(cv::Mat Tcw)
 {
-    ros::init(argc, argv, "RGBD");
-    ros::start();
+  geometry_msgs::PoseStamped poseMSG;
+      if(!Tcw.empty())
+      {
 
-    ROS_INFO("Usage: rosrun ORB_SLAM2 RGBD path_to_vocabulary path_to_settings" );
+          cv::Mat Rwc = Tcw.rowRange(0,3).colRange(0,3).t();
+          cv::Mat twc = -Rwc*Tcw.rowRange(0,3).col(3);
 
-    std::string path_to_vocabulary = ros::package::getPath("orb_slam2_ros")+"/Vocabulary/ORBvoc.bin";
-    std::cout<<  path_to_vocabulary << std::endl;
-    std::string path_to_settings = ros::package::getPath("orb_slam2_ros")+"/config/astra.yaml";
+          vector<float> q = ORB_SLAM2::Converter::toQuaternion(Rwc);
 
-    ros::param::get("path_to_vocabulary",path_to_vocabulary);
-    ros::param::get("path_to_settings",path_to_settings);
-    // Create SLAM system. It initializes all system threads and gets ready to process frames.
-    ORB_SLAM2::System SLAM(path_to_vocabulary,path_to_settings,ORB_SLAM2::System::RGBD,true);
+          camera_path.header.frame_id = "camera_link";
+          poseMSG.pose.position.x = twc.at<float>(0);
+          poseMSG.pose.position.y = twc.at<float>(2);
+          poseMSG.pose.position.z = twc.at<float>(1);
+          poseMSG.pose.orientation.x = q[0];
+          poseMSG.pose.orientation.y = q[1];
+          poseMSG.pose.orientation.z = q[2];
+          poseMSG.pose.orientation.w = q[3];
+          poseMSG.header.frame_id = "camera_pose";
+          poseMSG.header.stamp = ros::Time::now();
+          cout << "PublishPose position.x = " << poseMSG.pose.position.x << poseMSG.pose.position.y << poseMSG.pose.position.z << endl;
+          camera_path.poses.push_back(poseMSG);
 
 
-    ImageGrabber igb(&SLAM);
+          ros::Time currentTime = ros::Time::now();
 
-    ros::NodeHandle nh;
+          //publisher
+          geometry_msgs::TransformStamped odomTrans;
+          odomTrans.header.stamp = currentTime;
+          odomTrans.header.frame_id = "odom";
+          odomTrans.child_frame_id = "camera_link";
 
-    message_filters::Subscriber<sensor_msgs::Image> rgb_sub(nh, "camera/color/image_raw", 1);
-    message_filters::Subscriber<sensor_msgs::Image> depth_sub(nh, "camera/depth/image_rect_raw", 1);
-    typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::Image> sync_pol;
-    message_filters::Synchronizer<sync_pol> sync(sync_pol(10), rgb_sub,depth_sub);
-    sync.registerCallback(boost::bind(&ImageGrabber::GrabRGBD,&igb,_1,_2));
+          odomTrans.transform.translation.x = twc.at<float>(0);
+          odomTrans.transform.translation.y = twc.at<float>(2);
+          odomTrans.transform.translation.z = twc.at<float>(1);
+          //set quaternion
+          odomTrans.transform.rotation.w = q[3];
+          odomTrans.transform.rotation.x = q[0];
+          odomTrans.transform.rotation.y = q[1];
+          odomTrans.transform.rotation.z = q[2];
+          //send transform
+          odomBr.sendTransform(odomTrans);
 
-    ros::spin();
+          nav_msgs::Odometry odom;
+          odom.header.stamp = currentTime;
+          odom.header.frame_id = "odom";
+          odom.child_frame_id = "camera_link";
 
-    // Stop all threads
-    SLAM.Shutdown();
+          //set position
+          odom.pose.pose.position.x = twc.at<float>(0);
+          odom.pose.pose.position.y = twc.at<float>(2);
+          odom.pose.pose.position.z = twc.at<float>(1);
+          //set velocity
+          odom.twist.twist.linear.x = 0;
+          odom.twist.twist.linear.y = 0;
+          odom.twist.twist.linear.z = 0;
 
-    // Save camera trajectory
-    //SLAM.SaveKeyFrameTrajectoryTUM("KeyFrameTrajectory.txt");
-    std::string map_path = ros::package::getPath("orb_slam2_ros")+"/map/MapPointandKeyFrame.bin";
-
-    SLAM.SaveMap(map_path);
-
-    ros::shutdown();
-
-    return 0;
+          (odomVo)->publish(odom);
+          (cameraPath)->publish(camera_path);
+          (pPosPub)->publish(poseMSG);
+      }
 }
-
 void ImageGrabber::GrabRGBD(const sensor_msgs::ImageConstPtr& msgRGB,const sensor_msgs::ImageConstPtr& msgD)
 {
     // Copy the ros image message to cv::Mat.
@@ -115,7 +148,56 @@ void ImageGrabber::GrabRGBD(const sensor_msgs::ImageConstPtr& msgRGB,const senso
         return;
     }
 
-    mpSLAM->TrackRGBD(cv_ptrRGB->image,cv_ptrD->image,cv_ptrRGB->header.stamp.toSec());
+    cv::Mat pose =  mpSLAM->TrackRGBD(cv_ptrRGB->image,cv_ptrD->image,cv_ptrRGB->header.stamp.toSec());
 }
+
+
+int main(int argc, char **argv)
+{
+    ros::init(argc, argv, "RGBD");
+    ros::start();
+
+    ROS_INFO("Usage: rosrun ORB_SLAM2 RGBD path_to_vocabulary path_to_settings" );
+
+    std::string path_to_vocabulary = ros::package::getPath("orb_slam2_ros")+"/Vocabulary/ORBvoc.bin";
+    std::cout<<  path_to_vocabulary << std::endl;
+    std::string path_to_settings = ros::package::getPath("orb_slam2_ros")+"/config/astra.yaml";
+
+    ros::param::get("path_to_vocabulary",path_to_vocabulary);
+    ros::param::get("path_to_settings",path_to_settings);
+    // Create SLAM system. It initializes all system threads and gets ready to process frames.
+    ORB_SLAM2::System SLAM(path_to_vocabulary,path_to_settings,ORB_SLAM2::System::RGBD,true,false);
+
+    ImageGrabber igb(&SLAM);
+    ros::NodeHandle nh;
+    message_filters::Subscriber<sensor_msgs::Image> rgb_sub(nh, "camera/color/image_raw", 1);
+    message_filters::Subscriber<sensor_msgs::Image> depth_sub(nh, "camera/depth/image_rect_raw", 1);
+    typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::Image> sync_pol;
+    message_filters::Synchronizer<sync_pol> sync(sync_pol(10), rgb_sub,depth_sub);
+    sync.registerCallback(boost::bind(&ImageGrabber::GrabRGBD,&igb,_1,_2));
+
+    ros::Publisher PosPub = nh.advertise<geometry_msgs::PoseStamped>("camera/pose", 5);
+    ros::Publisher camerapath = nh.advertise<nav_msgs::Path>("camera_path",1);
+    ros::Publisher odom_vo = nh.advertise<nav_msgs::Odometry>("odom",50);
+
+    igb.pPosPub = &(PosPub);
+    igb.cameraPath = &(camerapath);
+    igb.odomVo = &(odom_vo);
+
+    ros::spin();
+    // Stop all threads
+    SLAM.Shutdown();
+    // Save camera trajectory
+    //SLAM.SaveKeyFrameTrajectoryTUM("KeyFrameTrajectory.txt");
+    std::string map_path = ros::package::getPath("orb_slam2_ros")+"/map/MapPointandKeyFrame.bin";
+
+    SLAM.SaveMap(map_path);
+
+    ros::shutdown();
+
+    return 0;
+}
+
+
 
 

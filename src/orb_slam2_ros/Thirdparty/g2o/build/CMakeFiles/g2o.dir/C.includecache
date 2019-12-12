@@ -1,4 +1,4 @@
-#IncludeRegexLine: ^[ 	]*[#%][ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+#IncludeRegexLine: ^[ 	]*#[ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
 
 #IncludeRegexScan: ^.*$
 
@@ -6,11 +6,11 @@
 
 #IncludeRegexTransform: 
 
-/home/banana/vslam/src/orb_slam2_ros/Thirdparty/g2o/g2o/stuff/os_specific.c
+/home/haosen/vslam/src/orb_slam2_ros/Thirdparty/g2o/g2o/stuff/os_specific.c
 os_specific.h
-/home/banana/vslam/src/orb_slam2_ros/Thirdparty/g2o/g2o/stuff/os_specific.h
+/home/haosen/vslam/src/orb_slam2_ros/Thirdparty/g2o/g2o/stuff/os_specific.h
 
-/home/banana/vslam/src/orb_slam2_ros/Thirdparty/g2o/g2o/stuff/os_specific.h
+/home/haosen/vslam/src/orb_slam2_ros/Thirdparty/g2o/g2o/stuff/os_specific.h
 stdio.h
 -
 stdlib.h
