@@ -1,3 +1,5 @@
 <launch>
-
+    <node pkg = "orb_slam2_ros" type = "RGBD" name ="ORB_SLAM2_Rgbd" output="screen">
+        <param name = "PureLocalization" type ="bool" value = "true" />
+    </node>
 </launch>

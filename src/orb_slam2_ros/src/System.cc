@@ -25,6 +25,8 @@
 #include <thread>
 #include <pangolin/pangolin.h>
 #include <iomanip>
+#include <ros/ros.h>
+#include <ros/package.h>
 
 // Get current directory of the system
 #include <unistd.h>  
@@ -122,17 +124,17 @@ System::System(const string &strVocFile, const string &strSettingsFile, const eS
     if(bUseViewer)
     {
         char SaveImg;
-        cout << "Do you want to save images from the viewer?(y/n)" << endl;
-        cin >> SaveImg;
+//        cout << "Do you want to save images from the viewer?(y/n)" << endl;
+//        cin >> SaveImg;
         
         mpViewer = new Viewer(this, mpFrameDrawer,mpMapDrawer,mpTracker,strSettingsFile);
         mptViewer = new thread(&Viewer::Run, mpViewer);
         mpTracker->SetViewer(mpViewer);
         
-        if(SaveImg == 'Y' || SaveImg == 'y'){  
-            mpViewer->mbSaveImg = true;
-            cout << "I'll save these images under the directiry of: '/$(HOME)/Pictures/ORB-SLAM2/'  or  '/$(HOME)/Pictures/ORB-SLAM2-IMU/'" << endl;
-        }
+//        if(SaveImg == 'Y' || SaveImg == 'y'){
+//            mpViewer->mbSaveImg = true;
+//            cout << "I'll save these images under the directiry of: '/$(HOME)/Pictures/ORB-SLAM2/'  or  '/$(HOME)/Pictures/ORB-SLAM2-IMU/'" << endl;
+//        }
     }
 
     if(PureLocalization)
@@ -140,9 +142,10 @@ System::System(const string &strVocFile, const string &strSettingsFile, const eS
       // Choose to use pure localization mode
       // load map
       ActivateLocalizationMode();
-      std::string cwd = getcwd(NULL, 0);
+      //std::string cwd = getcwd(NULL, 0);
       string strPathSystemSetting = strSettingsFile.c_str();
-      string strPathMap = cwd + "/orb_slam2/map/MapPointandKeyFrame.bin";
+      string strPathMap = ros::package::getPath("orb_slam2_ros") + "/map/MapPointandKeyFrame.bin";
+      //std::cout<<"-----------test:"<<strPathMap<<std::endl;
       SystemSetting *mySystemSetting = new SystemSetting(mpVocabulary);
       mySystemSetting->LoadSystemSetting(strPathSystemSetting);
       mpMap->Load(strPathMap, mySystemSetting, mpKeyFrameDatabase);

@@ -90,7 +90,7 @@ void ImageGrabber::rgbd_Vo(cv::Mat Tcw)
           //publisher
           geometry_msgs::TransformStamped odomTrans;
           odomTrans.header.stamp = currentTime;
-          odomTrans.header.frame_id = "odom";
+          odomTrans.header.frame_id = "vo";
           odomTrans.child_frame_id = "camera_link";
 
           odomTrans.transform.translation.x = twc.at<float>(0);
@@ -106,7 +106,7 @@ void ImageGrabber::rgbd_Vo(cv::Mat Tcw)
 
           nav_msgs::Odometry odom;
           odom.header.stamp = currentTime;
-          odom.header.frame_id = "odom";
+          odom.header.frame_id = "vo";
           odom.child_frame_id = "camera_link";
 
           //set position
@@ -149,6 +149,7 @@ void ImageGrabber::GrabRGBD(const sensor_msgs::ImageConstPtr& msgRGB,const senso
     }
 
     cv::Mat pose =  mpSLAM->TrackRGBD(cv_ptrRGB->image,cv_ptrD->image,cv_ptrRGB->header.stamp.toSec());
+    rgbd_Vo(pose);
 }
 
 
@@ -156,6 +157,7 @@ int main(int argc, char **argv)
 {
     ros::init(argc, argv, "RGBD");
     ros::start();
+    ros::NodeHandle nh;
 
     ROS_INFO("Usage: rosrun ORB_SLAM2 RGBD path_to_vocabulary path_to_settings" );
 
@@ -164,15 +166,16 @@ int main(int argc, char **argv)
     std::string path_to_settings = ros::package::getPath("orb_slam2_ros")+"/config/astra.yaml";
     bool PureLocalization = true;
 
-    ros::param::get("path_to_vocabulary",path_to_vocabulary);
-    ros::param::get("path_to_settings",path_to_settings);
-    ros::param::get("PureLocalization",PureLocalization);
+    ros::param::get("~path_to_vocabulary",path_to_vocabulary);
+    ros::param::get("~path_to_settings",path_to_settings);
+    ros::param::get("~PureLocalization",PureLocalization);
+
+    std::cout<<"-----------param test:"<<PureLocalization<<std::endl;
 
     // Create SLAM system. It initializes all system threads and gets ready to process frames.
     ORB_SLAM2::System SLAM(path_to_vocabulary,path_to_settings,ORB_SLAM2::System::RGBD,true,PureLocalization);
 
     ImageGrabber igb(&SLAM);
-    ros::NodeHandle nh;
     message_filters::Subscriber<sensor_msgs::Image> rgb_sub(nh, "camera/color/image_raw", 1);
     message_filters::Subscriber<sensor_msgs::Image> depth_sub(nh, "camera/depth/image_rect_raw", 1);
     typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::Image> sync_pol;
