@@ -163,7 +163,7 @@ int main(int argc, char **argv)
 
     std::string path_to_vocabulary = ros::package::getPath("orb_slam2_ros")+"/Vocabulary/ORBvoc.bin";
     std::cout<<  path_to_vocabulary << std::endl;
-    std::string path_to_settings = ros::package::getPath("orb_slam2_ros")+"/config/astra.yaml";
+    std::string path_to_settings = ros::package::getPath("orb_slam2_ros")+"/config/realsenseD435i.yaml";
     bool PureLocalization = true;
 
     ros::param::get("~path_to_vocabulary",path_to_vocabulary);
