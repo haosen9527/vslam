@@ -162,11 +162,14 @@ int main(int argc, char **argv)
     std::string path_to_vocabulary = ros::package::getPath("orb_slam2_ros")+"/Vocabulary/ORBvoc.bin";
     std::cout<<  path_to_vocabulary << std::endl;
     std::string path_to_settings = ros::package::getPath("orb_slam2_ros")+"/config/astra.yaml";
+    bool PureLocalization = true;
 
     ros::param::get("path_to_vocabulary",path_to_vocabulary);
     ros::param::get("path_to_settings",path_to_settings);
+    ros::param::get("PureLocalization",PureLocalization);
+
     // Create SLAM system. It initializes all system threads and gets ready to process frames.
-    ORB_SLAM2::System SLAM(path_to_vocabulary,path_to_settings,ORB_SLAM2::System::RGBD,true,false);
+    ORB_SLAM2::System SLAM(path_to_vocabulary,path_to_settings,ORB_SLAM2::System::RGBD,true,PureLocalization);
 
     ImageGrabber igb(&SLAM);
     ros::NodeHandle nh;
@@ -191,7 +194,10 @@ int main(int argc, char **argv)
     //SLAM.SaveKeyFrameTrajectoryTUM("KeyFrameTrajectory.txt");
     std::string map_path = ros::package::getPath("orb_slam2_ros")+"/map/MapPointandKeyFrame.bin";
 
-    SLAM.SaveMap(map_path);
+    if(PureLocalization == false)
+    {
+      SLAM.SaveMap(map_path);
+    }
 
     ros::shutdown();
 
