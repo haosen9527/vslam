@@ -138,35 +138,14 @@ System::System(const string &strVocFile, const string &strSettingsFile, const eS
     if(PureLocalization)
     {
       // Choose to use pure localization mode
-      char IsPureLocalization;
-      cout << "Do you want to run pure localization?(y/n)" << endl;
-      cin >> IsPureLocalization;
-      if(IsPureLocalization == 'Y' || IsPureLocalization == 'y'){
-          ActivateLocalizationMode();
-      }
-    }
-
-
-    //Load map
-    char IsLoadMap;
-
-    //get the current absoulte path  
-    std::string cwd = getcwd(NULL, 0);
-    cout << "The current dir is : " << cwd << endl; 
-    //string strPathSystemSetting = cwd + "/" + strSettingsFile.c_str();
-    string strPathSystemSetting = strSettingsFile.c_str();
-
-    cout << "Your setting file path is : " << strPathSystemSetting << endl; 
-    
-    string strPathMap = cwd + "/MapPointandKeyFrame.bin";
-    cout << "Your map file path would be : " << strPathMap << endl; 
-
-    cout << "Do you want to load the map?(y/n)" << endl;  
-    cin >> IsLoadMap;
-    SystemSetting *mySystemSetting = new SystemSetting(mpVocabulary);  
-    mySystemSetting->LoadSystemSetting(strPathSystemSetting);
-    if(IsLoadMap == 'Y' || IsLoadMap == 'y'){  
-        mpMap->Load(strPathMap, mySystemSetting, mpKeyFrameDatabase);
+      // load map
+      ActivateLocalizationMode();
+      std::string cwd = getcwd(NULL, 0);
+      string strPathSystemSetting = strSettingsFile.c_str();
+      string strPathMap = cwd + "/orb_slam2/map/MapPointandKeyFrame.bin";
+      SystemSetting *mySystemSetting = new SystemSetting(mpVocabulary);
+      mySystemSetting->LoadSystemSetting(strPathSystemSetting);
+      mpMap->Load(strPathMap, mySystemSetting, mpKeyFrameDatabase);
     }
 
     //Set pointers between threads
