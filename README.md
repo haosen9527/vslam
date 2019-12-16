@@ -5,7 +5,7 @@
 * PureLocalization
 * build map
 ### INSTALL
-#### Depends
+####  Depends
 * DBoW2
 ``` shell
 cd orb_slam2_ros/Thirdparty/DBoW2
@@ -18,7 +18,14 @@ cd g2o/Thirdparty/g2o
 mkdir build && cd build && cmake .. -DCMAKE_BUILD_TYPE=Release
 make -j4
 ```
+```shell
+catkin_make
+```
+
+
+
 ### Edit launch file
+
 ``` launch
  <param name = "PureLocalization" type ="bool" value = "true" />
 ```
