@@ -108,6 +108,14 @@ add_executable(RGBD
    ${catkin_LIBRARIES}
    ${PROJECT_NAME}
  )
+add_executable(ORBDemo
+    test/ORBDemo.cpp
+    )
+target_link_libraries(ORBDemo
+  ${catkin_LIBRARIES}
+  ${PROJECT_NAME}
+  ${OpenCV_LIBRARIES}
+)
 
 #############
 ## Install ##
